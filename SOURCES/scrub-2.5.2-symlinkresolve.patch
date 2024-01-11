@@ -1,0 +1,77 @@
+--- scrub-2.5.2.ori/src/scrub.c	2012-06-21 00:00:27.000000000 +0200
++++ scrub-2.5.2/src/scrub.c	2021-08-09 18:25:00.355142963 +0200
+@@ -283,8 +283,8 @@
+             }
+             scrub_disk(filename, sopt, seq, bopt, Sopt, Topt);
+             break;
+-        case FILE_LINK:
+-            if (Lopt) {
++        case FILE_REGULAR:
++   	    if (is_symlink(filename) && Lopt) {
+                 if (ropt) {
+                     printf("%s: unlinking %s\n", prog, filename);
+                     if (unlink(filename) != 0) {
+@@ -295,7 +295,6 @@
+                 }
+                 break;
+             }
+-        case FILE_REGULAR:
+             if (access(filename, R_OK|W_OK) < 0) {
+                 fprintf(stderr, "%s: no rw access to %s\n", prog, filename);
+                 exit(1);
+@@ -570,7 +570,7 @@
+     struct stat sb;
+     filetype_t ftype = filetype(path);
+ 
+-    assert(ftype == FILE_REGULAR || ftype == FILE_LINK);
++    assert(ftype == FILE_REGULAR);
+ 
+     if (stat(path, &sb) < 0) {
+         fprintf(stderr, "%s: stat %s: %s\n", prog, path, strerror(errno));
+--- scrub-2.5.2.ori/src/util.c	2012-06-21 00:00:27.000000000 +0200
++++ scrub-2.5.2/src/util.c	2021-08-10 15:38:26.748107704 +0200
+@@ -72,6 +72,15 @@
+     return n;
+ }
+ 
++/* Indicates whether the file represented by 'path' is a symlink.
++ */
++int
++is_symlink(char *path)
++{
++    struct stat sb;
++    return lstat(path, &sb) == 0 && S_ISLNK(sb.st_mode);
++}
++
+ /* Return the type of file represented by 'path'.
+  */
+ filetype_t
+@@ -90,10 +90,6 @@
+ 
+     filetype_t res = FILE_NOEXIST;
+ 
+-    if (lstat(path, &sb) == 0 && S_ISLNK(sb.st_mode)) {
+-        return FILE_LINK;
+-    }
+-
+     if (stat(path, &sb) == 0) {
+         if (S_ISREG(sb.st_mode))
+             res = FILE_REGULAR;
+--- scrub-2.5.2.ori/src/util.h	2012-06-21 00:00:27.000000000 +0200
++++ scrub-2.5.2/src/util.h	2021-08-16 16:12:25.306572001 +0200
+@@ -35,7 +35,6 @@
+     FILE_REGULAR,
+     FILE_CHAR,
+     FILE_BLOCK,
+-    FILE_LINK,
+     FILE_OTHER,
+ } filetype_t;
+ 
+@@ -43,6 +42,7 @@
+ 
+ int         read_all(int fd, unsigned char *buf, int count);
+ int         write_all(int fd, const unsigned char *buf, int count);
++int         is_symlink(char *path);
+ filetype_t  filetype(char *path);
+ off_t       blkalign(off_t offset, int blocksize, round_t rtype);
+ void *      alloc_buffer(int bufsize);
